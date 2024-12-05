@@ -11,9 +11,7 @@ id = "9787fdad4411428aadf21ec40282c34b"
 [vars]
 ZOHO_DESK_AUTH_DOMAIN = "accounts.zoho.com"
 ZOHO_DESK_TOKEN_ENDPOINT = "/oauth/v2/token"
-ZOHO_DESK_CLIENT_ID = "test"
-ZOHO_DESK_SECRET = "test"
-ZOHO_DESK_REDIRECT_URI = "test"
+ZOHO_DESK_REDIRECT_URI = "zoho-oath-worker.info-ba2.workers.dev"
 ZOHO_DESK_SCOPE = "Desk.tickets.ALL"
 
 # Workers Logs
