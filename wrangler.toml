@@ -4,6 +4,18 @@ main = "src/index.ts"
 compatibility_date = "2024-12-05"
 compatibility_flags = ["nodejs_compat"]
 
+[[kv_namespaces]]
+binding = "ZOHO_TOKENS"
+id = "9787fdad4411428aadf21ec40282c34b"
+
+[vars]
+ZOHO_DESK_AUTH_DOMAIN = "accounts.zoho.com"
+ZOHO_DESK_TOKEN_ENDPOINT = "/oauth/v2/token"
+ZOHO_DESK_CLIENT_ID = "test"
+ZOHO_DESK_SECRET = "test"
+ZOHO_DESK_REDIRECT_URI = "test"
+ZOHO_DESK_SCOPE = "Desk.tickets.ALL"
+
 # Workers Logs
 # Docs: https://developers.cloudflare.com/workers/observability/logs/workers-logs/
 # Configuration: https://developers.cloudflare.com/workers/observability/logs/workers-logs/#enable-workers-logs
