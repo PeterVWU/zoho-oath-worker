@@ -47,8 +47,6 @@ interface TicketData {
 export default {
 	async fetch(request: Request, env: Env): Promise<Response> {
 		const url = new URL(request.url);
-		console.log('url', url)
-		console.log('url.pathname', url.pathname)
 		try {
 			// OAuth routes
 			if (url.pathname === '/auth') {
@@ -92,6 +90,7 @@ function handleAuth(env: Env): Response {
 async function handleCallback(request: Request, env: Env): Promise<Response> {
 	const url = new URL(request.url);
 	const code = url.searchParams.get('code');
+	console.log('code', code)
 
 	if (!code) {
 		return new Response('Authorization code missing', { status: 400 });
@@ -99,7 +98,7 @@ async function handleCallback(request: Request, env: Env): Promise<Response> {
 
 	try {
 		const tokens = await getInitialTokens(code, env);
-
+		console.log('tokens', tokens)
 		// Store tokens in KV
 		await env.ZOHO_TOKENS.put('access_token', tokens.access_token);
 		await env.ZOHO_TOKENS.put('refresh_token', tokens.refresh_token);
@@ -154,6 +153,9 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 
 // Token Management
 async function getInitialTokens(code: string, env: Env): Promise<ZohoTokenResponse> {
+	console.log('getInitialTokens env.ZOHO_DESK_CLIENT_ID', env.ZOHO_DESK_CLIENT_ID)
+	console.log('getInitialTokens env.ZOHO_DESK_CLIENT_SECRET', env.ZOHO_DESK_CLIENT_SECRET)
+	console.log('getInitialTokens env.ZOHO_DESK_REDIRECT_URI', env.ZOHO_DESK_REDIRECT_URI)
 	const response = await fetch(`https://${env.ZOHO_DESK_AUTH_DOMAIN}/oauth/v2/token`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
