@@ -120,7 +120,7 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 	try {
 		// Get ticket data from request
 		const ticketData = await request.json() as TicketData;
-
+		console.log('ticketData', ticketData);
 		// Get valid access token
 		const accessToken = await getValidAccessToken(env.ZOHO_TOKENS, env);
 
@@ -136,6 +136,7 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 		});
 
 		const responseData = await ticketResponse.json();
+		console.log('ticket responseData', responseData);
 
 		return new Response(JSON.stringify(responseData), {
 			status: ticketResponse.status,
