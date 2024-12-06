@@ -47,7 +47,8 @@ interface TicketData {
 export default {
 	async fetch(request: Request, env: Env): Promise<Response> {
 		const url = new URL(request.url);
-
+		console.log('url', url)
+		console.log('url.pathname', url.pathname)
 		try {
 			// OAuth routes
 			if (url.pathname === '/auth') {
@@ -76,6 +77,7 @@ export default {
 
 // OAuth Handlers
 function handleAuth(env: Env): Response {
+	console.log('handleAuth')
 	const authUrl = `https://${env.ZOHO_DESK_AUTH_DOMAIN}/oauth/v2/auth?` +
 		`scope=Desk.tickets.ALL&` +
 		`client_id=${env.ZOHO_DESK_CLIENT_ID}&` +
