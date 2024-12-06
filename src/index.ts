@@ -19,20 +19,15 @@ interface Env {
 	ZOHO_DESK_CLIENT_SECRET: string;
 	ZOHO_DESK_REDIRECT_URI: string;
 	ZOHO_DESK_SCOPE: string;
+	ZOHO_DESK_DOMAIN: string,
+	ZOHO_DESK_ORGID: string,
 }
 
-// const ZOHO_AUTH = {
-// 	auth_domain: 'accounts.zoho.com',
-// 	token_endpoint: '/oauth/v2/token',
-// 	client_id: 'YOUR_CLIENT_ID',
-// 	client_secret: 'YOUR_CLIENT_SECRET',
-// 	redirect_uri: 'YOUR_REDIRECT_URI',
-// 	scope: 'Desk.tickets.ALL'
-// } as const;
 interface ZohoTokenResponse {
 	access_token: string;
 	refresh_token: string;
 	expires_in: number;
+	api_domain: string;
 	token_type: string;
 }
 
@@ -40,65 +35,124 @@ interface TokenResponse {
 	access_token: string;
 }
 
+interface TicketData {
+	subject: string;
+	departmentId: string;
+	description: string;
+	contactId?: string;
+	[key: string]: unknown;
+}
 
 
 export default {
 	async fetch(request: Request, env: Env): Promise<Response> {
 		const url = new URL(request.url);
 
-		// Handle initial OAuth authorization
-		if (url.pathname === '/auth') {
-			const authUrl = `https://${env.ZOHO_DESK_AUTH_DOMAIN}/oauth/v2/auth?` +
-				`scope=${env.ZOHO_DESK_SCOPE}&` +
-				`client_id=${env.ZOHO_DESK_CLIENT_ID}&` +
-				`response_type=code&` +
-				`redirect_uri=${env.ZOHO_DESK_REDIRECT_URI}&` +
-				`access_type=offline`;
-
-			return Response.redirect(authUrl);
-		}
-
-		// Handle OAuth callback
-		if (url.pathname === '/oauth/callback') {
-			const code = url.searchParams.get('code');
-			if (!code) {
-				return new Response('Authorization code missing', { status: 400 });
+		try {
+			// OAuth routes
+			if (url.pathname === '/auth') {
+				return handleAuth(env);
 			}
 
-			try {
-				const tokens = await getInitialTokens(code, env);
-				// Store tokens in KV
-				await env.ZOHO_TOKENS.put('access_token', tokens.access_token);
-				await env.ZOHO_TOKENS.put('refresh_token', tokens.refresh_token);
-				await env.ZOHO_TOKENS.put('token_expiry', (Date.now() + tokens.expires_in * 1000).toString());
-
-				return new Response('Authorization successful!');
-			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-				return new Response(`Authorization failed: ${errorMessage}`, { status: 500 });
+			if (url.pathname === '/oauth/callback') {
+				return handleCallback(request, env);
 			}
-		}
 
-		// Get valid access token for API requests
-		if (url.pathname === '/token') {
-			try {
-				const token = await getValidAccessToken(env.ZOHO_TOKENS, env);
-				const response: TokenResponse = { access_token: token };
-				return new Response(JSON.stringify(response), {
-					headers: { 'Content-Type': 'application/json' }
-				});
-			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-				return new Response(`Token error: ${errorMessage}`, { status: 500 });
+			// Ticket creation route
+			if (url.pathname === '/tickets') {
+				return handleTicketCreation(request, env);
 			}
-		}
 
-		return new Response('Not found', { status: 404 });
+			return new Response('Not found', { status: 404 });
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			return new Response(JSON.stringify({ error: errorMessage }), {
+				status: 500,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		}
 	}
-} satisfies ExportedHandler<Env>;
+};
 
+// OAuth Handlers
+function handleAuth(env: Env): Response {
+	const authUrl = `https://${env.ZOHO_DESK_AUTH_DOMAIN}/oauth/v2/auth?` +
+		`scope=Desk.tickets.ALL&` +
+		`client_id=${env.ZOHO_DESK_CLIENT_ID}&` +
+		`response_type=code&` +
+		`redirect_uri=${env.ZOHO_DESK_REDIRECT_URI}&` +
+		`access_type=offline&` +
+		`prompt=consent`;  // Force consent to get refresh token
+
+	return Response.redirect(authUrl);
+}
+
+async function handleCallback(request: Request, env: Env): Promise<Response> {
+	const url = new URL(request.url);
+	const code = url.searchParams.get('code');
+
+	if (!code) {
+		return new Response('Authorization code missing', { status: 400 });
+	}
+
+	try {
+		const tokens = await getInitialTokens(code, env);
+
+		// Store tokens in KV
+		await env.ZOHO_TOKENS.put('access_token', tokens.access_token);
+		await env.ZOHO_TOKENS.put('refresh_token', tokens.refresh_token);
+		await env.ZOHO_TOKENS.put('token_expiry', (Date.now() + tokens.expires_in * 1000).toString());
+
+		return new Response('Authorization successful! You can close this window.');
+	} catch (error) {
+		const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+		return new Response(`Authorization failed: ${errorMessage}`, { status: 500 });
+	}
+}
+
+// Ticket Handler
+async function handleTicketCreation(request: Request, env: Env): Promise<Response> {
+	if (request.method !== 'POST') {
+		return new Response('Method not allowed', { status: 405 });
+	}
+
+	try {
+		// Get ticket data from request
+		const ticketData = await request.json() as TicketData;
+
+		// Get valid access token
+		const accessToken = await getValidAccessToken(env.ZOHO_TOKENS, env);
+
+		// Create ticket
+		const ticketResponse = await fetch(`https://${env.ZOHO_DESK_DOMAIN}/api/v1/tickets`, {
+			method: 'POST',
+			headers: {
+				'orgId': env.ZOHO_DESK_ORGID,
+				'Authorization': `Zoho-oauthtoken ${accessToken}`,
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify(ticketData)
+		});
+
+		const responseData = await ticketResponse.json();
+
+		return new Response(JSON.stringify(responseData), {
+			status: ticketResponse.status,
+			headers: { 'Content-Type': 'application/json' }
+		});
+
+	} catch (error) {
+		const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+		return new Response(JSON.stringify({ error: errorMessage }), {
+			status: 500,
+			headers: { 'Content-Type': 'application/json' }
+		});
+	}
+}
+
+// Token Management
 async function getInitialTokens(code: string, env: Env): Promise<ZohoTokenResponse> {
-	const response = await fetch(`https://${env.ZOHO_DESK_AUTH_DOMAIN}${env.ZOHO_DESK_TOKEN_ENDPOINT}`, {
+	const response = await fetch(`https://${env.ZOHO_DESK_AUTH_DOMAIN}/oauth/v2/token`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 		body: new URLSearchParams({
@@ -117,8 +171,8 @@ async function getInitialTokens(code: string, env: Env): Promise<ZohoTokenRespon
 	return response.json();
 }
 
-async function refreshAccessToken(refresh_token: string, kv: KVNamespace, env: Env): Promise<string> {
-	const response = await fetch(`https://${env.ZOHO_DESK_AUTH_DOMAIN}${env.ZOHO_DESK_TOKEN_ENDPOINT}`, {
+async function refreshAccessToken(refresh_token: string, env: Env): Promise<string> {
+	const response = await fetch(`https://${env.ZOHO_DESK_AUTH_DOMAIN}/oauth/v2/token`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 		body: new URLSearchParams({
@@ -134,9 +188,6 @@ async function refreshAccessToken(refresh_token: string, kv: KVNamespace, env: E
 	}
 
 	const tokens: ZohoTokenResponse = await response.json();
-	await kv.put('access_token', tokens.access_token);
-	await kv.put('token_expiry', (Date.now() + tokens.expires_in * 1000).toString());
-
 	return tokens.access_token;
 }
 
@@ -154,7 +205,10 @@ async function getValidAccessToken(kv: KVNamespace, env: Env): Promise<string> {
 
 	// Otherwise refresh the token
 	if (refresh_token) {
-		return refreshAccessToken(refresh_token, kv, env);
+		const newToken = await refreshAccessToken(refresh_token, env);
+		await kv.put('access_token', newToken);
+		await kv.put('token_expiry', (Date.now() + 3600 * 1000).toString()); // 1 hour expiry
+		return newToken;
 	}
 
 	throw new Error('No valid tokens available. Please reauthorize.');
