@@ -38,8 +38,10 @@ interface TokenResponse {
 interface TicketData {
 	subject: string;
 	departmentId: string;
-	description: string;
-	contactId?: string;
+	contactId: string;
+	phone: string;
+	voicemailRecordingLink: string;
+	voicemailTranscription: string;
 	[key: string]: unknown;
 }
 
@@ -120,6 +122,7 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 	try {
 		// Get ticket data from request
 		const ticketData = await request.json() as TicketData;
+		const ticketDescription = createTicketDescription(ticketData)
 		console.log('ticketData', ticketData);
 		// Get valid access token
 		const accessToken = await getValidAccessToken(env.ZOHO_TOKENS, env);
@@ -132,7 +135,13 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 				'Authorization': `Zoho-oauthtoken ${accessToken}`,
 				'Content-Type': 'application/json'
 			},
-			body: JSON.stringify(ticketData)
+			body: JSON.stringify({
+				subject: ticketData.subject,
+				phone: ticketData.phone,
+				departmentId: ticketData.departmentId,
+				contactId: ticketData.contactId,
+				description: ticketDescription
+			})
 		});
 
 		const responseData = await ticketResponse.json();
@@ -150,6 +159,14 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 			headers: { 'Content-Type': 'application/json' }
 		});
 	}
+}
+
+function createTicketDescription(ticketData: TicketData): string {
+	const descriptionArray = []
+	descriptionArray.push(`<div>Voicemail Recoding: <a href="${ticketData.voicemailRecordingLink}">${ticketData.voicemailRecordingLink}</a></div>`)
+	descriptionArray.push(`<div>Voicemail Transcription: ${ticketData.voicemailTranscription}</div>`)
+
+	return descriptionArray.join('</br>')
 }
 
 // Token Management
