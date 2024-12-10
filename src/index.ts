@@ -164,9 +164,9 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 			const customerDetails = await getCustomerDetails(contact.ContactEmail.email, env);
 			log('info', 'Fetched customer details from Magento', { email: contact.ContactEmail.email });
 
-			// Normalize phone numbers for comparison
-			const incomingPhone = normalizePhoneNumber(ticketData.phone);
-			const customerPhone = customerDetails ? normalizePhoneNumber(customerDetails.phone) : null;
+			// // Normalize phone numbers for comparison
+			// const incomingPhone = normalizePhoneNumber(ticketData.phone);
+			// const customerPhone = customerDetails ? normalizePhoneNumber(customerDetails.phone) : null;
 
 			const orderHistory = await getOrderHistory(contact.ContactEmail.email, env);
 			log('info', 'Fetched order history from Magento', { orderCount: orderHistory.length });
@@ -174,6 +174,23 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 			// Create ticket description with customer and order info
 			ticketDescription = createDetailedDescription(ticketData, customerDetails, orderHistory);
 
+			// if (customerPhone && incomingPhone === customerPhone) {
+			// 	log('info', 'Phone number matches with Magento customer');
+
+			// 	// Fetch order history
+			// 	const orderHistory = await getOrderHistory(contact.ContactEmail.email, env);
+			// 	log('info', 'Fetched order history from Magento', { orderCount: orderHistory.length });
+
+			// 	// Create ticket description with customer and order info
+			// 	ticketDescription = createDetailedDescription(ticketData, customerDetails, orderHistory);
+			// } else {
+			// 	log('warn', 'Phone number mismatch between incoming phone and Magento customer', {
+			// 		incomingPhone,
+			// 		customerPhone
+			// 	});
+			// 	// Create ticket description without customer and order info
+			// 	ticketDescription = createDetailedDescription(ticketData, null, []);
+			// }
 		} else {
 			// Create ticket description without customer and order info
 			ticketDescription = createDetailedDescription(ticketData, null, []);
