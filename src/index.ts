@@ -1,16 +1,3 @@
-/**
- * Welcome to Cloudflare Workers! This is your first worker.
- *
- * - Run `npm run dev` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your worker in action
- * - Run `npm run deploy` to publish your worker
- *
- * Bind resources to your worker in `wrangler.toml`. After adding bindings, a type definition for the
- * `Env` object can be regenerated with `npm run cf-typegen`.
- *
- * Learn more at https://developers.cloudflare.com/workers/
- */
-
 interface Env {
 	ZOHO_TOKENS: KVNamespace;
 	ZOHO_DESK_AUTH_DOMAIN: string;
@@ -21,6 +8,9 @@ interface Env {
 	ZOHO_DESK_SCOPE: string;
 	ZOHO_DESK_DOMAIN: string,
 	ZOHO_DESK_ORGID: string,
+
+	MAGENTO_API_URL: string;
+	MAGENTO_API_TOKEN: string;
 }
 
 interface ZohoTokenResponse {
@@ -38,7 +28,7 @@ interface TokenResponse {
 interface TicketData {
 	subject: string;
 	departmentId: string;
-	contactId: string;
+	contactId?: string;
 	phone: string;
 	voicemailRecordingLink: string;
 	voicemailTranscription: string;
@@ -92,7 +82,6 @@ function handleAuth(env: Env): Response {
 async function handleCallback(request: Request, env: Env): Promise<Response> {
 	const url = new URL(request.url);
 	const code = url.searchParams.get('code');
-	console.log('code', code)
 
 	if (!code) {
 		return new Response('Authorization code missing', { status: 400 });
@@ -122,11 +111,28 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 	try {
 		// Get ticket data from request
 		const ticketData = await request.json() as TicketData;
-		const ticketDescription = createTicketDescription(ticketData)
-		console.log('ticketData', ticketData);
+
 		// Get valid access token
 		const accessToken = await getValidAccessToken(env.ZOHO_TOKENS, env);
 
+		// Fetch or create contact using the phone number
+		let contact = await getContactByPhone(ticketData.phone, accessToken, env);
+		let ticketDescription = ""
+		if (contact) {
+
+			// Fetch customer details and order history from Magento
+			const customerDetails = await getCustomerDetails(contact.email, env);
+			const orderHistory = await getOrderHistory(contact.email, env);
+
+			// Create ticket description
+			ticketDescription = createDetailedDescription(ticketData, customerDetails, orderHistory);
+		} else {
+			ticketDescription = createDetailedDescription(ticketData, null, []);
+
+		}
+
+
+		return new Response(JSON.stringify(ticketDescription));
 		// Create ticket
 		const ticketResponse = await fetch(`https://${env.ZOHO_DESK_DOMAIN}/api/v1/tickets`, {
 			method: 'POST',
@@ -145,7 +151,6 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 		});
 
 		const responseData = await ticketResponse.json();
-		console.log('ticket responseData', responseData);
 
 		return new Response(JSON.stringify(responseData), {
 			status: ticketResponse.status,
@@ -161,19 +166,84 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 	}
 }
 
-function createTicketDescription(ticketData: TicketData): string {
-	const descriptionArray = []
-	descriptionArray.push(`<div>Voicemail Recoding: <a href="${ticketData.voicemailRecordingLink}">${ticketData.voicemailRecordingLink}</a></div>`)
-	descriptionArray.push(`<div>Voicemail Transcription: ${ticketData.voicemailTranscription}</div>`)
+// Fetch contact by phone
+async function getContactByPhone(phone: string, accessToken: string, env: Env): Promise<{ id: string, email: string } | null> {
+	const response = await fetch(`https://${env.ZOHO_DESK_DOMAIN}/api/v1/contacts/search?phone=${encodeURIComponent(phone)}`, {
+		headers: {
+			'orgId': env.ZOHO_DESK_ORGID,
+			'Authorization': `Zoho-oauthtoken ${accessToken}`
+		}
+	});
 
-	return descriptionArray.join('</br>')
+	if (response.ok) {
+		const data: any = await response.json();
+		if (data.data && data.data.length > 0) {
+			const contact = data.data[0];
+			return { id: contact.id, email: contact.email };
+		}
+	}
+	return null;
+}
+
+
+// Fetch customer details from Magento
+async function getCustomerDetails(email: string, env: Env): Promise<any> {
+	const response = await fetch(`${env.MAGENTO_API_URL}/customers/search?searchCriteria[filter_groups][0][filters][0][field]=email&searchCriteria[filter_groups][0][filters][0][value]=${encodeURIComponent(email)}&searchCriteria[filter_groups][0][filters][0][condition_type]=eq`, {
+		headers: {
+			'Authorization': `Bearer ${env.MAGENTO_API_TOKEN}`,
+			'Content-Type': 'application/json'
+		}
+	});
+
+	if (!response.ok) {
+		throw new Error(`Failed to fetch customer details: ${response.statusText}`);
+	}
+
+	const data: any = await response.json();
+	return data.items?.[0] || null;
+}
+
+// Fetch order history from Magento
+async function getOrderHistory(email: string, env: Env): Promise<any[]> {
+	const response = await fetch(`${env.MAGENTO_API_URL}/orders?searchCriteria[filter_groups][0][filters][0][field]=customer_email&searchCriteria[filter_groups][0][filters][0][value]=${encodeURIComponent(email)}&searchCriteria[filter_groups][0][filters][0][condition_type]=eq`, {
+		headers: {
+			'Authorization': `Bearer ${env.MAGENTO_API_TOKEN}`,
+			'Content-Type': 'application/json'
+		}
+	});
+
+	if (!response.ok) {
+		throw new Error(`Failed to fetch order history: ${response.statusText}`);
+	}
+
+	const data: any = await response.json();
+	return data.items || [];
+}
+
+// Create detailed ticket description
+function createDetailedDescription(ticketData: TicketData, customerDetails: any, orderHistory: any[]): string {
+	const descriptionArray = [];
+
+	descriptionArray.push(`<div>Voicemail Recording: <a href="${ticketData.voicemailRecordingLink}">${ticketData.voicemailRecordingLink}</a></div>`);
+	descriptionArray.push(`<div>Voicemail Transcription: ${ticketData.voicemailTranscription}</div>`);
+
+	if (customerDetails) {
+		descriptionArray.push(`<div>Customer Name: ${customerDetails.firstname} ${customerDetails.lastname}</div>`);
+		descriptionArray.push(`<div>Email: ${customerDetails.email}</div>`);
+	}
+
+	if (orderHistory.length > 0) {
+		descriptionArray.push('<div>Order History:</div>');
+		orderHistory.forEach(order => {
+			descriptionArray.push(`<div>- Order ID: ${order.increment_id}, Total: ${order.grand_total}, Status: ${order.status}</div>`);
+		});
+	}
+
+	return descriptionArray.join('</br>');
 }
 
 // Token Management
 async function getInitialTokens(code: string, env: Env): Promise<ZohoTokenResponse> {
-	console.log('getInitialTokens env.ZOHO_DESK_CLIENT_ID', env.ZOHO_DESK_CLIENT_ID)
-	console.log('getInitialTokens env.ZOHO_DESK_CLIENT_SECRET', env.ZOHO_DESK_CLIENT_SECRET)
-	console.log('getInitialTokens env.ZOHO_DESK_REDIRECT_URI', env.ZOHO_DESK_REDIRECT_URI)
 	const response = await fetch(`https://${env.ZOHO_DESK_AUTH_DOMAIN}/oauth/v2/token`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

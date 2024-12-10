@@ -15,6 +15,7 @@ ZOHO_DESK_REDIRECT_URI = "https://zoho-oath-worker.info-ba2.workers.dev/oauth/ca
 ZOHO_DESK_SCOPE = "Desk.tickets.ALL"
 ZOHO_DESK_DOMAIN = "desk.zoho.com"
 ZOHO_DESK_ORGID = "729742506"
+MAGENTO_API_URL = "https://vapewholesaleusa.com/rest/V1"
 
 # Workers Logs
 # Docs: https://developers.cloudflare.com/workers/observability/logs/workers-logs/
