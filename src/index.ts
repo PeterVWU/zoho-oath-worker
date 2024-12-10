@@ -171,6 +171,7 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 		});
 
 	} catch (error) {
+		console.log('ticketResponse.error', JSON.stringify(error))
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 		return new Response(JSON.stringify({ error: errorMessage }), {
 			status: 500,
