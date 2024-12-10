@@ -168,12 +168,14 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 
 // Fetch contact by phone
 async function getContactByPhone(phone: string, accessToken: string, env: Env): Promise<{ id: string, email: string } | null> {
+	console.log("getContactByPhone", phone, accessToken)
 	const response = await fetch(`https://${env.ZOHO_DESK_DOMAIN}/api/v1/contacts/search?phone=${encodeURIComponent(phone)}`, {
 		headers: {
 			'orgId': env.ZOHO_DESK_ORGID,
 			'Authorization': `Zoho-oauthtoken ${accessToken}`
 		}
 	});
+	console.log("getContactByPhone  response", response)
 
 	if (response.ok) {
 		const data: any = await response.json();
@@ -188,6 +190,7 @@ async function getContactByPhone(phone: string, accessToken: string, env: Env): 
 
 // Fetch customer details from Magento
 async function getCustomerDetails(email: string, env: Env): Promise<any> {
+	console.log("getCustomerDetails", email)
 	const response = await fetch(`${env.MAGENTO_API_URL}/customers/search?searchCriteria[filter_groups][0][filters][0][field]=email&searchCriteria[filter_groups][0][filters][0][value]=${encodeURIComponent(email)}&searchCriteria[filter_groups][0][filters][0][condition_type]=eq`, {
 		headers: {
 			'Authorization': `Bearer ${env.MAGENTO_API_TOKEN}`,
@@ -195,6 +198,7 @@ async function getCustomerDetails(email: string, env: Env): Promise<any> {
 		}
 	});
 
+	console.log("getCustomerDetails response", response)
 	if (!response.ok) {
 		throw new Error(`Failed to fetch customer details: ${response.statusText}`);
 	}
@@ -205,6 +209,7 @@ async function getCustomerDetails(email: string, env: Env): Promise<any> {
 
 // Fetch order history from Magento
 async function getOrderHistory(email: string, env: Env): Promise<any[]> {
+	console.log("getOrderHistory", email)
 	const response = await fetch(`${env.MAGENTO_API_URL}/orders?searchCriteria[filter_groups][0][filters][0][field]=customer_email&searchCriteria[filter_groups][0][filters][0][value]=${encodeURIComponent(email)}&searchCriteria[filter_groups][0][filters][0][condition_type]=eq`, {
 		headers: {
 			'Authorization': `Bearer ${env.MAGENTO_API_TOKEN}`,
@@ -212,6 +217,7 @@ async function getOrderHistory(email: string, env: Env): Promise<any[]> {
 		}
 	});
 
+	console.log("getOrderHistory", response)
 	if (!response.ok) {
 		throw new Error(`Failed to fetch order history: ${response.statusText}`);
 	}
@@ -222,6 +228,7 @@ async function getOrderHistory(email: string, env: Env): Promise<any[]> {
 
 // Create detailed ticket description
 function createDetailedDescription(ticketData: TicketData, customerDetails: any, orderHistory: any[]): string {
+	console.log("createDetailedDescription", ticketData, customerDetails, orderHistory)
 	const descriptionArray = [];
 
 	descriptionArray.push(`<div>Voicemail Recording: <a href="${ticketData.voicemailRecordingLink}">${ticketData.voicemailRecordingLink}</a></div>`);
