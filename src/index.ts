@@ -159,6 +159,7 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 				subject: ticketData.subject,
 				phone: ticketData.phone,
 				departmentId: ticketData.departmentId,
+				contactId: ticketData.contactId,
 				description: ticketDescription
 			})
 		});
