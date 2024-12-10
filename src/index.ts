@@ -11,6 +11,9 @@ interface Env {
 
 	MAGENTO_API_URL: string;
 	MAGENTO_API_TOKEN: string;
+
+	CLOUDTALK_USERNAME: string;
+	CLOUDTALK_PASSWORD: string;
 }
 
 interface ZohoTokenResponse {
@@ -35,6 +38,20 @@ interface TicketData {
 	[key: string]: unknown;
 }
 
+
+interface CloudTalkContact {
+	Contact: {
+		id: string;
+		name: string;
+		company: string;
+	};
+	ContactNumber: {
+		public_number: number;
+	};
+	ContactEmail: {
+		email: string;
+	};
+}
 
 export default {
 	async fetch(request: Request, env: Env): Promise<Response> {
@@ -115,15 +132,14 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 		// Get valid access token
 		const accessToken = await getValidAccessToken(env.ZOHO_TOKENS, env);
 
-		// Fetch or create contact using the phone number
-		let contact = await getContactByPhone(ticketData.phone, accessToken, env);
+		const contact = await getContactByPhoneCloudTalk(ticketData.phone, env);
+
 		let ticketDescription = ""
 		if (contact) {
 
 			// Fetch customer details and order history from Magento
-			const customerDetails = await getCustomerDetails(contact.email, env);
-			const orderHistory = await getOrderHistory(contact.email, env);
-
+			const customerDetails = await getCustomerDetails(contact.ContactEmail.email, env);
+			const orderHistory = await getOrderHistory(contact.ContactEmail.email, env);
 			// Create ticket description
 			ticketDescription = createDetailedDescription(ticketData, customerDetails, orderHistory);
 		} else {
@@ -131,8 +147,6 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 
 		}
 
-
-		return new Response(JSON.stringify(ticketDescription));
 		// Create ticket
 		const ticketResponse = await fetch(`https://${env.ZOHO_DESK_DOMAIN}/api/v1/tickets`, {
 			method: 'POST',
@@ -145,7 +159,6 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 				subject: ticketData.subject,
 				phone: ticketData.phone,
 				departmentId: ticketData.departmentId,
-				contactId: ticketData.contactId,
 				description: ticketDescription
 			})
 		});
@@ -166,24 +179,33 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 	}
 }
 
-// Fetch contact by phone
-async function getContactByPhone(phone: string, accessToken: string, env: Env): Promise<{ id: string, email: string } | null> {
-	console.log("getContactByPhone", phone, accessToken)
-	const response = await fetch(`https://${env.ZOHO_DESK_DOMAIN}/api/v1/contacts/search?phone=${encodeURIComponent(phone)}`, {
+// Fetch contact by phone using CloudTalk API
+async function getContactByPhoneCloudTalk(phone: string, env: Env): Promise<CloudTalkContact | null> {
+	console.log("getContactByPhoneCloudTalk", phone);
+
+	const url = `https://my.cloudtalk.io/api/contacts/index.json?keyword=${encodeURIComponent(phone)}`;
+
+	const auth = btoa(`${env.CLOUDTALK_USERNAME}:${env.CLOUDTALK_PASSWORD}`);
+
+	const response = await fetch(url, {
+		method: 'GET',
 		headers: {
-			'orgId': env.ZOHO_DESK_ORGID,
-			'Authorization': `Zoho-oauthtoken ${accessToken}`
+			'Authorization': `Basic ${auth}`,
+			'Content-Type': 'application/json'
 		}
 	});
-	console.log("getContactByPhone  response", response)
+
+	console.log("getContactByPhoneCloudTalk response status:", response.status);
 
 	if (response.ok) {
 		const data: any = await response.json();
-		if (data.data && data.data.length > 0) {
-			const contact = data.data[0];
-			return { id: contact.id, email: contact.email };
+		if (data.responseData && data.responseData.data && data.responseData.data.length > 0) {
+			// Assuming you want the first matching contact
+			return data.responseData.data[0] as CloudTalkContact;
 		}
 	}
+
+	console.error("No contact found in CloudTalk for phone:", phone);
 	return null;
 }
 
@@ -235,6 +257,8 @@ function createDetailedDescription(ticketData: TicketData, customerDetails: any,
 	descriptionArray.push(`<div>Voicemail Transcription: ${ticketData.voicemailTranscription}</div>`);
 
 	if (customerDetails) {
+		descriptionArray.push(`<div style="color: orange; font-weight: bold;">Note: The following customer information is based on the provided phone number and may not be entirely accurate. Please verify the details.</div>`);
+
 		descriptionArray.push(`<div>Customer Name: ${customerDetails.firstname} ${customerDetails.lastname}</div>`);
 		descriptionArray.push(`<div>Email: ${customerDetails.email}</div>`);
 	}
