@@ -168,23 +168,12 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 			const incomingPhone = normalizePhoneNumber(ticketData.phone);
 			const customerPhone = customerDetails ? normalizePhoneNumber(customerDetails.phone) : null;
 
-			if (customerPhone && incomingPhone === customerPhone) {
-				log('info', 'Phone number matches with Magento customer');
+			const orderHistory = await getOrderHistory(contact.ContactEmail.email, env);
+			log('info', 'Fetched order history from Magento', { orderCount: orderHistory.length });
 
-				// Fetch order history
-				const orderHistory = await getOrderHistory(contact.ContactEmail.email, env);
-				log('info', 'Fetched order history from Magento', { orderCount: orderHistory.length });
+			// Create ticket description with customer and order info
+			ticketDescription = createDetailedDescription(ticketData, customerDetails, orderHistory);
 
-				// Create ticket description with customer and order info
-				ticketDescription = createDetailedDescription(ticketData, customerDetails, orderHistory);
-			} else {
-				log('warn', 'Phone number mismatch between incoming phone and Magento customer', {
-					incomingPhone,
-					customerPhone
-				});
-				// Create ticket description without customer and order info
-				ticketDescription = createDetailedDescription(ticketData, null, []);
-			}
 		} else {
 			// Create ticket description without customer and order info
 			ticketDescription = createDetailedDescription(ticketData, null, []);
