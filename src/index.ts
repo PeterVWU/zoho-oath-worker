@@ -234,8 +234,9 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 // Fetch contact by phone using CloudTalk API
 async function getContactByPhoneCloudTalk(phone: string, env: Env): Promise<CloudTalkContact | null> {
 	log('info', 'Fetching contact from CloudTalk', { phone });
+	log('info', 'CLOUDTALK_USERNAME', `${env.CLOUDTALK_USERNAME}:${env.CLOUDTALK_PASSWORD}`);
 
-	const url = `https://my.cloudtalk.io/api/contacts/index.json?keyword=${encodeURIComponent(phone)}`;
+	const url = `https://my.cloudtalk.io/api/contacts/index.json?keyword=${normalizePhoneNumber(phone)}`;
 
 	const auth = btoa(`${env.CLOUDTALK_USERNAME}:${env.CLOUDTALK_PASSWORD}`);
 
