@@ -164,7 +164,7 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 		});
 
 		const responseData = await ticketResponse.json();
-
+		console.log('ticketResponse.status', ticketResponse.status)
 		return new Response(JSON.stringify(responseData), {
 			status: ticketResponse.status,
 			headers: { 'Content-Type': 'application/json' }
