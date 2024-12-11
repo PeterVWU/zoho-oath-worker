@@ -78,6 +78,7 @@ export default {
 
 			// Ticket creation route
 			if (url.pathname === '/tickets') {
+				log('info', "calling /tickets request detail", { request: JSON.stringify(request) })
 				return handleTicketCreation(request, env);
 			}
 
