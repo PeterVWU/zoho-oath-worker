@@ -74,17 +74,16 @@ export default {
 			}
 
 			if (url.pathname === '/oauth/callback') {
-				ctx.waitUntil(handleCallback(request, env))
-				return new Response(JSON.stringify({ status: 'processing', message: 'Request received' }), {
-					status: 202, // HTTP 202 Accepted
-					headers: { 'Content-Type': 'application/json' },
-				});
+				return handleCallback(request, env);
 			}
 
 			// Ticket creation route
 			if (url.pathname === '/tickets') {
-				log('info', "calling /tickets request detail", { request: JSON.stringify(request) })
-				return handleTicketCreation(request, env);
+				ctx.waitUntil(handleTicketCreation(request, env))
+				return new Response(JSON.stringify({ status: 'processing', message: 'Request received' }), {
+					status: 202, // HTTP 202 Accepted
+					headers: { 'Content-Type': 'application/json' },
+				});
 			}
 
 			return new Response('Not found', { status: 404 });
