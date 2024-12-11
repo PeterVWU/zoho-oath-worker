@@ -65,7 +65,7 @@ function log(level: 'info' | 'warn' | 'error', message: string, data?: any): voi
 }
 
 export default {
-	async fetch(request: Request, env: Env): Promise<Response> {
+	async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
 		const url = new URL(request.url);
 		try {
 			// OAuth routes
@@ -74,7 +74,11 @@ export default {
 			}
 
 			if (url.pathname === '/oauth/callback') {
-				return handleCallback(request, env);
+				ctx.waitUntil(handleCallback(request, env))
+				return new Response(JSON.stringify({ status: 'processing', message: 'Request received' }), {
+					status: 202, // HTTP 202 Accepted
+					headers: { 'Content-Type': 'application/json' },
+				});
 			}
 
 			// Ticket creation route
