@@ -142,6 +142,7 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 	}
 
 	try {
+		log('info', 'handleTicketCreation', request.headers)
 		// Get ticket data from request
 		const ticketData = await request.json() as TicketData;
 		log('info', 'Received ticket data', { ticketData });
@@ -241,11 +242,6 @@ async function getContactByPhoneCloudTalk(phone: string, env: Env): Promise<Clou
 	const auth = btoa(`${env.CLOUDTALK_USERNAME}:${env.CLOUDTALK_PASSWORD}`);
 
 	log('info', 'auth', auth);
-	// Implementing a 7-second timeout
-	const controller = new AbortController();
-	const timeoutId = setTimeout(() => controller.abort(), 7000); // 7000 ms = 7 seconds
-
-	const startTime = Date.now();
 
 	try {
 		const response = await fetch(url, {
@@ -254,12 +250,9 @@ async function getContactByPhoneCloudTalk(phone: string, env: Env): Promise<Clou
 				'Authorization': `Basic ${auth}`,
 				'Content-Type': 'application/json'
 			},
-			signal: controller.signal
 		});
 
-		clearTimeout(timeoutId);
-		const duration = Date.now() - startTime;
-		log('info', 'CloudTalk API response received', { status: response.status, duration: `${duration}ms` });
+		log('info', 'CloudTalk API response received', { status: response.status });
 
 		if (response.ok) {
 			const data: any = await response.json();
