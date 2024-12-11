@@ -240,28 +240,45 @@ async function getContactByPhoneCloudTalk(phone: string, env: Env): Promise<Clou
 	const auth = btoa(`${env.CLOUDTALK_USERNAME}:${env.CLOUDTALK_PASSWORD}`);
 
 	log('info', 'auth', auth);
+	// Implementing a 7-second timeout
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), 7000); // 7000 ms = 7 seconds
 
-	const response = await fetch(url, {
-		method: 'GET',
-		headers: {
-			'Authorization': `Basic ${auth}`,
-			'Content-Type': 'application/json'
+	const startTime = Date.now();
+
+	try {
+		const response = await fetch(url, {
+			method: 'GET',
+			headers: {
+				'Authorization': `Basic ${auth}`,
+				'Content-Type': 'application/json'
+			},
+			signal: controller.signal
+		});
+
+		clearTimeout(timeoutId);
+		const duration = Date.now() - startTime;
+		log('info', 'CloudTalk API response received', { status: response.status, duration: `${duration}ms` });
+
+		if (response.ok) {
+			const data: any = await response.json();
+			if (data.responseData && data.responseData.data && data.responseData.data.length > 0) {
+				// Assuming you want the first matching contact
+				log('info', 'Contact found in CloudTalk', { contactCount: data.responseData.data.length });
+				return data.responseData.data[0] as CloudTalkContact;
+			}
 		}
-	});
 
-	log('info', 'CloudTalk API response received', { status: response.status });
-
-	if (response.ok) {
-		const data: any = await response.json();
-		if (data.responseData && data.responseData.data && data.responseData.data.length > 0) {
-			// Assuming you want the first matching contact
-			log('info', 'Contact found in CloudTalk', { contactCount: data.responseData.data.length });
-			return data.responseData.data[0] as CloudTalkContact;
+		log('warn', 'No contact found in CloudTalk for the provided phone number', { phone });
+		return null;
+	} catch (error: any) {
+		if (error.name === 'AbortError') {
+			log('error', 'CloudTalk API request timed out', { phone });
+		} else {
+			log('error', 'Error fetching contact from CloudTalk', { phone, error: error.message });
 		}
+		return null;
 	}
-
-	log('warn', 'No contact found in CloudTalk for the provided phone number', { phone });
-	return null;
 }
 
 // Fetch customer details from Magento
