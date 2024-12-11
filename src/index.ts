@@ -151,7 +151,8 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 		log('info', 'Retrieved valid Zoho access token');
 
 		// Fetch or create contact using the phone number via CloudTalk
-		const contact = await getContactByPhoneCloudTalk(ticketData.phone, env);
+		// const contact = await getContactByPhoneCloudTalk(ticketData.phone, env);
+		const contact: any = null;
 		if (contact) {
 			log('info', 'Contact found in CloudTalk', { contactId: contact.Contact.id });
 		} else {
