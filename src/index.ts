@@ -142,7 +142,7 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 	}
 
 	try {
-		log('info', 'handleTicketCreation', request.headers)
+		log('info', 'handleTicketCreation header', { headers: JSON.stringify(request.headers) })
 		// Get ticket data from request
 		const ticketData = await request.json() as TicketData;
 		log('info', 'Received ticket data', { ticketData });
