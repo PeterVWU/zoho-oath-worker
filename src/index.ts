@@ -6,6 +6,7 @@ interface Env {
 	ZOHO_CLIENT_ID: string;
 	ZOHO_CLIENT_SECRET: string;
 	ZOHO_REDIRECT_URI: string;
+	ZOHO_SCOPES: string;
 }
 
 interface ZohoTokenResponse {
@@ -64,7 +65,7 @@ export default class ZohoOauthWorker extends WorkerEntrypoint {
 function handleAuth(env: Env): Response {
 	log('info', 'handleAuth invoked');
 	const authUrl = `https://${env.ZOHO_AUTH_DOMAIN}/oauth/v2/auth?` +
-		`scope=Desk.tickets.ALL&` +
+		`scope=${env.ZOHO_SCOPES}` +
 		`client_id=${env.ZOHO_CLIENT_ID}&` +
 		`response_type=code&` +
 		`redirect_uri=${encodeURIComponent(env.ZOHO_REDIRECT_URI)}&` +
