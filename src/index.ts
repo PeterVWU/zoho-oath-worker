@@ -49,6 +49,7 @@ function log(level: 'info' | 'warn' | 'error', message: string, data?: any): voi
 export default {
 	async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
 		const url = new URL(request.url);
+		log('info', "requested url", url)
 		try {
 
 			if (url.pathname === '/auth') {
@@ -56,6 +57,7 @@ export default {
 			} else if (url.pathname === '/oauth/callback') {
 				return handleCallback(request, env);
 			} else if (url.pathname === '/token') {
+				log('info', "token called", url)
 				return handleTokenRequest(env);
 			} else if (url.pathname === '/tickets') {
 				ctx.waitUntil(handleTicketCreation(request, env))
