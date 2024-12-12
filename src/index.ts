@@ -24,10 +24,6 @@ interface ZohoTokenResponse {
 	token_type: string;
 }
 
-interface TokenResponse {
-	access_token: string;
-}
-
 interface TicketData {
 	subject: string;
 	departmentId: string;
@@ -37,20 +33,6 @@ interface TicketData {
 	voicemailRecordingLink: string;
 	voicemailTranscription: string;
 	[key: string]: unknown;
-}
-
-interface CloudTalkContact {
-	Contact: {
-		id: string;
-		name: string;
-		company: string;
-	};
-	ContactNumber: {
-		public_number: number;
-	};
-	ContactEmail: {
-		email: string;
-	};
 }
 
 // Logging Helper Function
@@ -68,25 +50,22 @@ export default {
 	async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
 		const url = new URL(request.url);
 		try {
-			// OAuth routes
+
 			if (url.pathname === '/auth') {
 				return handleAuth(env);
-			}
-
-			if (url.pathname === '/oauth/callback') {
+			} else if (url.pathname === '/oauth/callback') {
 				return handleCallback(request, env);
-			}
-
-			// Ticket creation route
-			if (url.pathname === '/tickets') {
+			} else if (url.pathname === '/token') {
+				return handleTokenRequest(env);
+			} else if (url.pathname === '/tickets') {
 				ctx.waitUntil(handleTicketCreation(request, env))
 				return new Response(JSON.stringify({ status: 'processing', message: 'Request received' }), {
 					status: 202,
 					headers: { 'Content-Type': 'application/json' },
 				});
+			} else {
+				return new Response('Not Found', { status: 404 });
 			}
-
-			return new Response('Not found', { status: 404 });
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 			log('error', 'Unhandled exception in fetch handler', { error: errorMessage });
@@ -153,7 +132,7 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 		log('info', 'Received ticket data', { ticketData });
 
 		// Get valid access token
-		const accessToken = await getValidAccessToken(env.ZOHO_TOKENS, env);
+		const accessToken = await getValidAccessToken(env);
 		log('info', 'Retrieved valid Zoho access token');
 
 		let ticketDescription = "";
@@ -205,48 +184,6 @@ async function handleTicketCreation(request: Request, env: Env): Promise<Respons
 			status: 500,
 			headers: { 'Content-Type': 'application/json' }
 		});
-	}
-}
-
-// Fetch contact by phone using CloudTalk API
-async function getContactByPhoneCloudTalk(phone: string, env: Env): Promise<CloudTalkContact | null> {
-	log('info', 'Fetching contact from CloudTalk', { phone });
-
-	const url = `https://my.cloudtalk.io/api/contacts/index.json?keyword=${normalizePhoneNumber(phone)}`;
-
-	const auth = btoa(`${env.CLOUDTALK_USERNAME}:${env.CLOUDTALK_PASSWORD}`);
-
-	log('info', 'auth', auth);
-
-	try {
-		const response = await fetch(url, {
-			method: 'GET',
-			headers: {
-				'Authorization': `Basic ${auth}`,
-				'Content-Type': 'application/json'
-			},
-		});
-
-		log('info', 'CloudTalk API response received', { status: response.status });
-
-		if (response.ok) {
-			const data: any = await response.json();
-			if (data.responseData && data.responseData.data && data.responseData.data.length > 0) {
-				// Assuming you want the first matching contact
-				log('info', 'Contact found in CloudTalk', { contactCount: data.responseData.data.length });
-				return data.responseData.data[0] as CloudTalkContact;
-			}
-		}
-
-		log('warn', 'No contact found in CloudTalk for the provided phone number', { phone });
-		return null;
-	} catch (error: any) {
-		if (error.name === 'AbortError') {
-			log('error', 'CloudTalk API request timed out', { phone });
-		} else {
-			log('error', 'Error fetching contact from CloudTalk', { phone, error: error.message });
-		}
-		return null;
 	}
 }
 
@@ -342,9 +279,20 @@ function createDetailedDescription(ticketData: TicketData, customerDetails: any,
 	return descriptionArray.join('<br/>');
 }
 
-// Normalize phone number by removing non-digit characters
-function normalizePhoneNumber(phone: string): string {
-	return phone.replace(/\D/g, '');
+async function handleTokenRequest(env: Env): Promise<Response> {
+	try {
+		const accessToken = await getValidAccessToken(env);
+		return new Response(JSON.stringify({ access_token: accessToken }), {
+			status: 200,
+			headers: { 'Content-Type': 'application/json' },
+		});
+	} catch (error) {
+		const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+		return new Response(JSON.stringify({ error: errorMessage }), {
+			status: 500,
+			headers: { 'Content-Type': 'application/json' },
+		});
+	}
 }
 
 // Token Management
@@ -403,13 +351,13 @@ async function refreshAccessToken(refresh_token: string, env: Env): Promise<stri
 	return tokens.access_token;
 }
 
-async function getValidAccessToken(kv: KVNamespace, env: Env): Promise<string> {
+async function getValidAccessToken(env: Env): Promise<string> {
 	log('info', 'Retrieving valid Zoho access token from KV');
 
 	const [access_token, refresh_token, token_expiry] = await Promise.all([
-		kv.get('access_token'),
-		kv.get('refresh_token'),
-		kv.get('token_expiry')
+		env.ZOHO_TOKENS.get('access_token'),
+		env.ZOHO_TOKENS.get('refresh_token'),
+		env.ZOHO_TOKENS.get('token_expiry')
 	]);
 
 	log('info', 'Fetched tokens from KV', { access_token: access_token ? 'exists' : 'missing', refresh_token: refresh_token ? 'exists' : 'missing', token_expiry });
@@ -424,8 +372,8 @@ async function getValidAccessToken(kv: KVNamespace, env: Env): Promise<string> {
 	if (refresh_token) {
 		log('info', 'Access token expired or missing. Attempting to refresh using refresh token');
 		const newToken = await refreshAccessToken(refresh_token, env);
-		await kv.put('access_token', newToken);
-		await kv.put('token_expiry', (Date.now() + 3600 * 1000).toString()); // 1 hour expiry
+		await env.ZOHO_TOKENS.put('access_token', newToken);
+		await env.ZOHO_TOKENS.put('token_expiry', (Date.now() + 3600 * 1000).toString()); // 1 hour expiry
 		log('info', 'New access token stored in KV');
 		return newToken;
 	}
