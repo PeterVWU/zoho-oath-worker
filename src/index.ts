@@ -1,3 +1,4 @@
+import { WorkerEntrypoint } from "cloudflare:workers";
 interface Env {
 	ZOHO_TOKENS: KVNamespace;
 	ZOHO_DESK_AUTH_DOMAIN: string;
@@ -46,9 +47,10 @@ function log(level: 'info' | 'warn' | 'error', message: string, data?: any): voi
 	console[level](JSON.stringify(logEntry));
 }
 
-export default {
-	async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
+export default class ZohoOauthWorker extends WorkerEntrypoint {
+	async fetch(request: Request): Promise<Response> {
 		const url = new URL(request.url);
+		const env = this.env as Env;
 		log('info', "requested url", url)
 		try {
 
@@ -60,7 +62,7 @@ export default {
 				log('info', "token called", url)
 				return handleTokenRequest(env);
 			} else if (url.pathname === '/tickets') {
-				ctx.waitUntil(handleTicketCreation(request, env))
+				this.ctx.waitUntil(handleTicketCreation(request, env))
 				return new Response(JSON.stringify({ status: 'processing', message: 'Request received' }), {
 					status: 202,
 					headers: { 'Content-Type': 'application/json' },
