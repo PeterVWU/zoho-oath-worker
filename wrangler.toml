@@ -9,13 +9,9 @@ binding = "ZOHO_TOKENS"
 id = "9787fdad4411428aadf21ec40282c34b"
 
 [vars]
-ZOHO_DESK_AUTH_DOMAIN = "accounts.zoho.com"
-ZOHO_DESK_TOKEN_ENDPOINT = "/oauth/v2/token"
-ZOHO_DESK_REDIRECT_URI = "https://zoho-oath-worker.info-ba2.workers.dev/oauth/callback"
-ZOHO_DESK_SCOPE = "Desk.tickets.ALL"
-ZOHO_DESK_DOMAIN = "desk.zoho.com"
-ZOHO_DESK_ORGID = "729742506"
-MAGENTO_API_URL = "https://vapewholesaleusa.com/rest/V1"
+ZOHO_AUTH_DOMAIN = "accounts.zoho.com"
+ZOHO_TOKEN_ENDPOINT = "/oauth/v2/token"
+ZOHO_REDIRECT_URI = "https://zoho-oath-worker.info-ba2.workers.dev/oauth/callback"
 
 # Workers Logs
 # Docs: https://developers.cloudflare.com/workers/observability/logs/workers-logs/

@@ -1,11 +1,11 @@
 import { WorkerEntrypoint } from "cloudflare:workers";
 interface Env {
 	ZOHO_TOKENS: KVNamespace;
-	ZOHO_DESK_AUTH_DOMAIN: string;
-	ZOHO_DESK_TOKEN_ENDPOINT: string;
-	ZOHO_DESK_CLIENT_ID: string;
-	ZOHO_DESK_CLIENT_SECRET: string;
-	ZOHO_DESK_REDIRECT_URI: string;
+	ZOHO_AUTH_DOMAIN: string;
+	ZOHO_TOKEN_ENDPOINT: string;
+	ZOHO_CLIENT_ID: string;
+	ZOHO_CLIENT_SECRET: string;
+	ZOHO_REDIRECT_URI: string;
 }
 
 interface ZohoTokenResponse {
@@ -63,11 +63,11 @@ export default class ZohoOauthWorker extends WorkerEntrypoint {
 // OAuth Handlers
 function handleAuth(env: Env): Response {
 	log('info', 'handleAuth invoked');
-	const authUrl = `https://${env.ZOHO_DESK_AUTH_DOMAIN}/oauth/v2/auth?` +
+	const authUrl = `https://${env.ZOHO_AUTH_DOMAIN}/oauth/v2/auth?` +
 		`scope=Desk.tickets.ALL&` +
-		`client_id=${env.ZOHO_DESK_CLIENT_ID}&` +
+		`client_id=${env.ZOHO_CLIENT_ID}&` +
 		`response_type=code&` +
-		`redirect_uri=${encodeURIComponent(env.ZOHO_DESK_REDIRECT_URI)}&` +
+		`redirect_uri=${encodeURIComponent(env.ZOHO_REDIRECT_URI)}&` +
 		`access_type=offline&` +
 		`prompt=consent`;  // Force consent to get refresh token
 
@@ -121,14 +121,14 @@ async function handleTokenRequest(env: Env): Promise<Response> {
 async function getInitialTokens(code: string, env: Env): Promise<ZohoTokenResponse> {
 	log('info', 'Requesting initial tokens from Zoho');
 
-	const response = await fetch(`https://${env.ZOHO_DESK_AUTH_DOMAIN}/oauth/v2/token`, {
+	const response = await fetch(`https://${env.ZOHO_AUTH_DOMAIN}/oauth/v2/token`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 		body: new URLSearchParams({
 			code,
-			client_id: env.ZOHO_DESK_CLIENT_ID,
-			client_secret: env.ZOHO_DESK_CLIENT_SECRET,
-			redirect_uri: env.ZOHO_DESK_REDIRECT_URI,
+			client_id: env.ZOHO_CLIENT_ID,
+			client_secret: env.ZOHO_CLIENT_SECRET,
+			redirect_uri: env.ZOHO_REDIRECT_URI,
 			grant_type: 'authorization_code'
 		})
 	});
@@ -149,13 +149,13 @@ async function getInitialTokens(code: string, env: Env): Promise<ZohoTokenRespon
 async function refreshAccessToken(refresh_token: string, env: Env): Promise<string> {
 	log('info', 'Refreshing Zoho access token', { refresh_token });
 
-	const response = await fetch(`https://${env.ZOHO_DESK_AUTH_DOMAIN}/oauth/v2/token`, {
+	const response = await fetch(`https://${env.ZOHO_AUTH_DOMAIN}/oauth/v2/token`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 		body: new URLSearchParams({
 			refresh_token,
-			client_id: env.ZOHO_DESK_CLIENT_ID,
-			client_secret: env.ZOHO_DESK_CLIENT_SECRET,
+			client_id: env.ZOHO_CLIENT_ID,
+			client_secret: env.ZOHO_CLIENT_SECRET,
 			grant_type: 'refresh_token'
 		})
 	});
