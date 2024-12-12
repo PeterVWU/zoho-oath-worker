@@ -79,6 +79,11 @@ export default class ZohoOauthWorker extends WorkerEntrypoint {
 			});
 		}
 	}
+	async getAccessToken(): Promise<string> {
+		const env = this.env as Env
+		const accessToken = await getValidAccessToken(env);
+		return accessToken
+	}
 };
 
 // OAuth Handlers
